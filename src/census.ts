@@ -181,12 +181,19 @@ function filterSymbols(entries: CtagsEntry[], repoRoot: string): Symbol[] {
     else if (METHOD_KINDS.has(entry.kind)) kind = 'method';
     else if (CLASS_KINDS.has(entry.kind)) kind = 'class';
     // ctags marks exported arrow functions / React components as 'constant'
-    // — include them if they look like components (PascalCase) or hooks (use*)
     else if (entry.kind === 'constant') {
-      if (/^[A-Z][a-zA-Z0-9]+$/.test(entry.name) || /^use[A-Z]/.test(entry.name)) {
-        kind = 'function'; // treat components and hooks as functions
+      const isTsx = entry.path.endsWith('.tsx');
+      const isPascalCase = /^[A-Z][a-zA-Z0-9]+$/.test(entry.name);
+      const isHook = /^use[A-Z]/.test(entry.name);
+      // In .tsx files, include all PascalCase and hook constants (components)
+      // In other files, same heuristic but stricter
+      if (isPascalCase || isHook) {
+        kind = 'function';
+      } else if (isTsx && /^[a-z][a-zA-Z0-9]+$/.test(entry.name)) {
+        // In .tsx, also include camelCase exported constants (HOCs, utilities)
+        kind = 'function';
       } else {
-        continue; // skip plain constants
+        continue;
       }
     }
     else continue;
@@ -203,6 +210,41 @@ function filterSymbols(entries: CtagsEntry[], repoRoot: string): Symbol[] {
       feature: '',
       featureName: '',
     });
+  }
+
+  // Second pass: scan .tsx/.jsx files for exported arrow functions that
+  // ctags missed entirely (not even as constants)
+  const seenFiles = new Set(symbols.map(s => s.file));
+  const tsxFiles = new Set<string>();
+  for (const entry of entries) {
+    const rel = path.relative(repoRoot, entry.path);
+    if ((rel.endsWith('.tsx') || rel.endsWith('.jsx')) && !tsxFiles.has(rel)) {
+      tsxFiles.add(rel);
+    }
+  }
+
+  for (const relFile of tsxFiles) {
+    const absFile = path.join(repoRoot, relFile);
+    try {
+      const src = fs.readFileSync(absFile, 'utf-8');
+      const exportRe = /export\s+(?:default\s+)?(?:const|function)\s+([A-Z][a-zA-Z0-9]*)/g;
+      let match;
+      while ((match = exportRe.exec(src)) !== null) {
+        const name = match[1];
+        // Skip if ctags already captured this symbol in this file
+        if (symbols.some(s => s.file === relFile && s.name === name)) continue;
+        const line = src.substring(0, match.index).split('\n').length;
+        symbols.push({
+          name,
+          kind: 'function',
+          file: relFile,
+          line,
+          signature: match[0].trim(),
+          feature: '',
+          featureName: '',
+        });
+      }
+    } catch {}
   }
 
   return symbols;
