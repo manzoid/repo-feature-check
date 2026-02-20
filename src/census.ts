@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync, spawnSync } from 'child_process';
 
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CtagsEntry {
@@ -274,8 +275,81 @@ function getGitChurn(repoRoot: string, since: string, excludePatterns: string[])
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
+const HELP = `
+repo-feature-check — Extract every function, method, and class from a codebase
+
+USAGE
+  repo-feature-check <repo-path> [options]
+
+OPTIONS
+  --json <path>       Write full symbol data as JSON to this path
+  --since <date>      Overlay git churn data (e.g. --since 2024-01-01)
+  --config <path>     Optional feature config for path-based classification
+  --help              Show this help
+
+REQUIRES
+  universal-ctags     brew install universal-ctags
+
+EXAMPLES
+  repo-feature-check .
+  repo-feature-check /path/to/repo --json /tmp/symbols.json --since 2024-06-01
+  repo-feature-check . --config my-features.json --json /tmp/out.json
+
+USAGE WITH CLAUDE CODE
+  This tool is designed to be used as a first step in AI-assisted codebase
+  analysis. Run it to extract a structured symbol index, then use Claude Code
+  to do the intelligent analysis.
+
+  Recommended workflow — paste this into Claude Code:
+
+    I want to understand the feature architecture of this codebase.
+
+    1. Run: repo-feature-check . --json /tmp/symbols.json --since 2024-01-01
+    2. Read the JSON output to see the directory structure and symbol
+       distribution — identify likely feature areas from the file paths
+    3. For each area, read representative source files to understand what
+       the code actually does
+    4. Build up a feature taxonomy — group related functions/classes into
+       named features with categories
+    5. As you read more code, refine your taxonomy — merge, split, or
+       rename features as your understanding deepens
+    6. Output your findings in this exact format:
+
+       # Feature Architecture: <repo-name>
+       Analyzed <date> | <total> symbols | <n> features | <n> categories
+
+       ## Feature Map
+       | Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
+       |----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
+
+       (F = functions, M = methods, C = classes, Hotspot = LOW/MED/HIGH)
+
+       ## Top 20 Hotspot Files
+       | Churn | Commits | Feature | File |
+       |------:|--------:|---------|------|
+
+       ## Cross-Cutting Concerns
+       | Concern | Used By | Notes |
+       |---------|---------|-------|
+
+       ## Architectural Observations
+       | Observation | Affected Features | Severity |
+       |-------------|-------------------|----------|
+
+    Focus on user-facing features, not implementation details. Shared
+    infrastructure (utils, DB layer, auth) goes in Cross-Cutting Concerns.
+    Use the churn data to identify hotspots and flag architectural issues.
+`;
+
 function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(HELP);
+    process.exit(0);
+  }
+
+
   const repoRoot = args.find(a => !a.startsWith('--'));
   const configIdx = args.indexOf('--config');
   const configFile = configIdx >= 0 ? args[configIdx + 1] : null;
@@ -285,7 +359,8 @@ function main() {
   const since = sinceIdx >= 0 ? args[sinceIdx + 1] : null;
 
   if (!repoRoot) {
-    console.error('Usage: repo-feature-check /path/to/repo [--config features.json] [--json out.json] [--since 2025-01-01]');
+    console.error('Usage: repo-feature-check <repo-path> [--json out.json] [--since date] [--config features.json]');
+    console.error('       repo-feature-check --help for full usage and Claude Code integration');
     process.exit(1);
   }
 
