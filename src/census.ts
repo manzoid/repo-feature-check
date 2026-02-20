@@ -295,32 +295,49 @@ names alone, read actual source files to clarify. Prioritize high-churn
 areas and large clusters. The goal is 100% coverage — every symbol
 assigned to a feature.
 
-Step 4: Produce the final report in exactly this format:
+Step 4: Write the final report to /tmp/rfc-<repo-name>-report.md AND
+display it. The report MUST use markdown pipe tables — not box-drawing
+characters, not plain text lists, not any other format. Every symbol
+must be accounted for — if some don't fit a feature, add an
+"Uncategorized" row showing how many remain.
 
+Use this exact structure (copy the pipe-table syntax literally):
+
+\`\`\`markdown
 # Feature Architecture: <repo-name>
 Analyzed <date> | <total> symbols | <n> features | <n> categories
 
 ## Feature Map
+
 | Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
 |----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
-(one row per feature, F=functions M=methods C=classes, Hotspot=LOW/MED/HIGH)
+| Commerce | Payments | 1339 | 17 | 988 | 334 | 170 | HIGH | ... |
+
+Column key: F=functions, M=methods, C=classes, Churn=lines added+deleted, Hotspot=LOW/MED/HIGH
 
 ## Top 20 Hotspot Files
+
 | Churn | Commits | Feature | File |
 |------:|--------:|---------|------|
+| 4070 | 15 | Payments | pensight-front/.../OfferingOrderStepPayment.tsx |
 
 ## Cross-Cutting Concerns
-| Concern | Used By | Notes |
-|---------|---------|-------|
-(shared infrastructure, auth, utils, DB layer, etc.)
+
+| Concern | Symbols | Used By | Notes |
+|---------|--------:|---------|-------|
+| GraphQL types | 953 | All frontend | Auto-generated schema |
 
 ## Architectural Observations
+
 | Observation | Affected Features | Severity |
 |-------------|-------------------|----------|
-(coupling issues, abstraction gaps, refactoring opportunities)
+| PaymentManager.kt is a mega-file | Payments, Orders | HIGH |
+\`\`\`
 
-Fill in every section. Focus on user-facing features, not implementation
-details. Use the churn data to identify hotspots and flag risks.`;
+The example rows above are just to show the format — replace them
+with your actual findings. Every section must use pipe tables.
+Focus on user-facing features. Shared infrastructure goes in
+Cross-Cutting Concerns. Use churn data to identify hotspots.`;
 
 const HELP = `
 repo-feature-check — Extract every function, method, and class from a codebase
