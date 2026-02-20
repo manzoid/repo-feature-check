@@ -360,9 +360,23 @@ Analyzed <date> | <total> symbols | <n> features | <n> categories
 
 | Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
 |----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
-| Commerce | Payments | 1339 | 17 | 988 | 334 | 170 | HIGH | ... |
+| Commerce | Payments | 1339 | 17 | 988 | 334 | 170 | HIGH | Stripe integration, invoicing, payment plans |
 
 Column key: F=functions, M=methods, C=classes, Churn=lines added+deleted, Hotspot=LOW/MED/HIGH
+
+## Feature Detail
+
+For each feature in the map above, break it down into sub-features:
+
+| Feature | Sub-Feature | Symbols | Key Files | Description |
+|---------|-------------|--------:|-----------|-------------|
+| Payments | Stripe Checkout | 340 | PaymentIntentService.kt, CheckoutForm.tsx | Payment intent creation, 3DS handling |
+| Payments | Invoice Generation | 210 | InvoiceService.kt, InvoiceTemplate.tsx | Recurring and one-time invoice creation |
+| Payments | Payout Processing | 180 | PayoutService.kt | Creator payout scheduling and Stripe transfers |
+
+(Break every feature into its distinct capabilities. Be specific — not
+"payment processing" but "Stripe checkout flow" vs "invoice generation"
+vs "payout scheduling". Read source files where needed to distinguish.)
 
 ## Top 20 Hotspot Files
 
