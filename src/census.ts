@@ -275,6 +275,53 @@ function getGitChurn(repoRoot: string, since: string, excludePatterns: string[])
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
+const CLAUDE_PROMPT = `Analyze the feature architecture of this codebase end-to-end.
+
+Step 1: Check the git log briefly to understand the repo's age and
+activity level. Based on what you see, propose a churn window to the
+user (e.g. "This repo has ~40 commits/month since 2022 — I'd suggest
+analyzing the last 6 months for churn. Sound good?"). Also ask if
+there's a particular area they want you to focus on. Then run:
+  repo-feature-check . --json /tmp/rfc-<repo-name>-<YYYYMMDD-HHmmss>.json --since <chosen-date>
+(Use the actual repo directory name and current timestamp in the filename.)
+
+Step 2: Read the JSON. Every symbol in the codebase is listed with its
+file path, name, kind, and scope. Categorize ALL of them — not a sample.
+Group by directory clusters and use path names and symbol names to assign
+features. Most symbols can be categorized from the index alone.
+
+Step 3: Where a directory cluster's purpose is ambiguous from paths and
+names alone, read actual source files to clarify. Prioritize high-churn
+areas and large clusters. The goal is 100% coverage — every symbol
+assigned to a feature.
+
+Step 4: Produce the final report in exactly this format:
+
+# Feature Architecture: <repo-name>
+Analyzed <date> | <total> symbols | <n> features | <n> categories
+
+## Feature Map
+| Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
+|----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
+(one row per feature, F=functions M=methods C=classes, Hotspot=LOW/MED/HIGH)
+
+## Top 20 Hotspot Files
+| Churn | Commits | Feature | File |
+|------:|--------:|---------|------|
+
+## Cross-Cutting Concerns
+| Concern | Used By | Notes |
+|---------|---------|-------|
+(shared infrastructure, auth, utils, DB layer, etc.)
+
+## Architectural Observations
+| Observation | Affected Features | Severity |
+|-------------|-------------------|----------|
+(coupling issues, abstraction gaps, refactoring opportunities)
+
+Fill in every section. Focus on user-facing features, not implementation
+details. Use the churn data to identify hotspots and flag risks.`;
+
 const HELP = `
 repo-feature-check — Extract every function, method, and class from a codebase
 
@@ -296,49 +343,12 @@ EXAMPLES
   repo-feature-check . --config my-features.json --json /tmp/out.json
 
 USAGE WITH CLAUDE CODE
-  This tool is designed to be used as a first step in AI-assisted codebase
-  analysis. Run it to extract a structured symbol index, then use Claude Code
-  to do the intelligent analysis.
+  Run with no arguments to get the Claude Code prompt:
+    repo-feature-check
 
-  Recommended workflow — paste this into Claude Code:
-
-    I want to understand the feature architecture of this codebase.
-
-    1. Run: repo-feature-check . --json /tmp/symbols.json --since 2024-01-01
-    2. Read the JSON output to see the directory structure and symbol
-       distribution — identify likely feature areas from the file paths
-    3. For each area, read representative source files to understand what
-       the code actually does
-    4. Build up a feature taxonomy — group related functions/classes into
-       named features with categories
-    5. As you read more code, refine your taxonomy — merge, split, or
-       rename features as your understanding deepens
-    6. Output your findings in this exact format:
-
-       # Feature Architecture: <repo-name>
-       Analyzed <date> | <total> symbols | <n> features | <n> categories
-
-       ## Feature Map
-       | Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
-       |----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
-
-       (F = functions, M = methods, C = classes, Hotspot = LOW/MED/HIGH)
-
-       ## Top 20 Hotspot Files
-       | Churn | Commits | Feature | File |
-       |------:|--------:|---------|------|
-
-       ## Cross-Cutting Concerns
-       | Concern | Used By | Notes |
-       |---------|---------|-------|
-
-       ## Architectural Observations
-       | Observation | Affected Features | Severity |
-       |-------------|-------------------|----------|
-
-    Focus on user-facing features, not implementation details. Shared
-    infrastructure (utils, DB layer, auth) goes in Cross-Cutting Concerns.
-    Use the churn data to identify hotspots and flag architectural issues.
+  Copy-paste that prompt into Claude Code. It will run the extraction,
+  read source files, and produce a complete feature architecture report
+  autonomously.
 `;
 
 function main() {
@@ -359,9 +369,10 @@ function main() {
   const since = sinceIdx >= 0 ? args[sinceIdx + 1] : null;
 
   if (!repoRoot) {
-    console.error('Usage: repo-feature-check <repo-path> [--json out.json] [--since date] [--config features.json]');
-    console.error('       repo-feature-check --help for full usage and Claude Code integration');
-    process.exit(1);
+    console.log(CLAUDE_PROMPT);
+    console.error('\nTo run extraction directly: repo-feature-check <repo-path> [--json out.json] [--since date]');
+    console.error('Full options: repo-feature-check --help');
+    process.exit(0);
   }
 
   const absRoot = path.resolve(repoRoot);

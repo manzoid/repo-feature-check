@@ -63,25 +63,55 @@ The text report goes to stdout. JSON (via `--json`) includes:
 
 ## Usage with Claude Code
 
-This tool is the mechanical half of a two-part workflow. It gives you a structured symbol index fast — Claude Code provides the intelligence.
+This tool is the mechanical half of a two-part workflow. It extracts a structured symbol index fast — Claude Code provides the intelligence by reading actual source files and building a feature taxonomy.
 
 ### Recommended workflow
 
-In Claude Code, paste:
+Paste the following prompt into Claude Code. It will run the tool, analyze the codebase, and produce a complete feature architecture report without stopping to ask questions.
 
-> I want to understand the feature architecture of this codebase. Start by running `repo-feature-check` on this repo with `--json` to get a symbol index. Then iteratively:
->
-> 1. Look at the directory structure and symbol distribution to identify likely feature areas
-> 2. For each area, read representative source files to understand what the code actually does
-> 3. Build up a feature taxonomy — group related functions/classes into named features with categories (e.g. "Payments" under "Commerce")
-> 4. As you read more code, refine your taxonomy — merge, split, or rename features as your understanding deepens
-> 5. When done, output a feature map: for each feature, list its name, category, description, key files, and symbol count
->
-> Focus on user-facing features, not implementation details. A "Payments" feature is more useful than "StripeWebhookHandler". Shared infrastructure (utils, DB layer, auth) should be its own category.
->
-> Use the git churn data (`--since` flag) to identify hotspots — features with high churn are where active development is happening.
+```
+Analyze the feature architecture of this codebase end-to-end. Do not
+stop to ask me questions — complete the entire analysis autonomously.
 
-Claude will run the tool, read the JSON output, then start reading actual source files to build up a rich feature-level understanding of the codebase.
+Step 1: Run repo-feature-check . --json /tmp/symbols.json --since 2024-01-01
+
+Step 2: Read the JSON. Look at the directory tree and symbol distribution
+to identify feature areas. Group files by directory clusters.
+
+Step 3: For each directory cluster, read 2-3 representative source files
+to understand what the code actually does. Build a feature taxonomy as
+you go — named features grouped into categories (e.g. "Payments" under
+"Commerce"). As you read more code, refine the taxonomy: merge, split,
+or rename features as your understanding deepens.
+
+Step 4: When you have covered all major areas, produce the final report
+in exactly this format:
+
+# Feature Architecture: <repo-name>
+Analyzed <date> | <total> symbols | <n> features | <n> categories
+
+## Feature Map
+| Category | Feature | Symbols | F | M | C | Churn | Hotspot | Description |
+|----------|---------|--------:|--:|--:|--:|------:|---------|-------------|
+(one row per feature, F=functions M=methods C=classes, Hotspot=LOW/MED/HIGH)
+
+## Top 20 Hotspot Files
+| Churn | Commits | Feature | File |
+|------:|--------:|---------|------|
+
+## Cross-Cutting Concerns
+| Concern | Used By | Notes |
+|---------|---------|-------|
+(shared infrastructure, auth, utils, DB layer, etc.)
+
+## Architectural Observations
+| Observation | Affected Features | Severity |
+|-------------|-------------------|----------|
+(coupling issues, abstraction gaps, refactoring opportunities)
+
+Fill in every section. Focus on user-facing features, not implementation
+details. Use the churn data to identify hotspots and flag risks.
+```
 
 ## Feature config (optional)
 
