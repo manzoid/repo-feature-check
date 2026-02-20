@@ -281,21 +281,28 @@ Step 1: Check the git log briefly to understand the repo's age and
 activity level. Based on what you see, propose a churn window to the
 user (e.g. "This repo has ~40 commits/month since 2022 — I'd suggest
 analyzing the last 6 months for churn. Sound good?"). Also ask if
-there's a particular area they want you to focus on. Then run:
-  repo-feature-check . --json /tmp/rfc-<repo-name>-<YYYYMMDD-HHmmss>.json --since <chosen-date>
-(Use the actual repo directory name and current timestamp in the filename.)
+there's a particular area they want you to focus on.
 
-Step 2: Read the JSON. Every symbol in the codebase is listed with its
+Step 2: Look at the top-level directory structure. Identify directories
+that should be excluded from analysis — vendored assets, generated code,
+lock files, design docs, third-party bundles, etc. These pollute both
+symbol counts and churn data. Then run:
+  repo-feature-check . --json /tmp/rfc-<repo-name>-<YYYYMMDD-HHmmss>.json --since <chosen-date> --exclude <dir1> --exclude <dir2> ...
+(Use the actual repo directory name and current timestamp in the filename.)
+Note: node_modules, .git, dist, build, and *.d.ts are already excluded
+by default. Use --exclude for project-specific vendored/generated dirs.
+
+Step 3: Read the JSON. Every symbol in the codebase is listed with its
 file path, name, kind, and scope. Categorize ALL of them — not a sample.
 Group by directory clusters and use path names and symbol names to assign
 features. Most symbols can be categorized from the index alone.
 
-Step 3: Where a directory cluster's purpose is ambiguous from paths and
+Step 4: Where a directory cluster's purpose is ambiguous from paths and
 names alone, read actual source files to clarify. Prioritize high-churn
 areas and large clusters. The goal is 100% coverage — every symbol
 assigned to a feature.
 
-Step 4: Write the final report to /tmp/rfc-<repo-name>-report.md AND
+Step 5: Write the final report to /tmp/rfc-<repo-name>-report.md AND
 display it. The report MUST use markdown pipe tables — not box-drawing
 characters, not plain text lists, not any other format. Every symbol
 must be accounted for — if some don't fit a feature, add an
@@ -348,6 +355,7 @@ USAGE
 OPTIONS
   --json <path>       Write full symbol data as JSON to this path
   --since <date>      Overlay git churn data (e.g. --since 2024-01-01)
+  --exclude <pattern> Exclude paths from extraction and churn (repeatable)
   --config <path>     Optional feature config for path-based classification
   --help              Show this help
 
@@ -384,6 +392,13 @@ function main() {
   const jsonOut = jsonIdx >= 0 ? args[jsonIdx + 1] : null;
   const sinceIdx = args.indexOf('--since');
   const since = sinceIdx >= 0 ? args[sinceIdx + 1] : null;
+  // Collect all --exclude values
+  const cliExcludes: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--exclude' && args[i + 1]) {
+      cliExcludes.push(args[++i]);
+    }
+  }
 
   if (!repoRoot) {
     console.log(CLAUDE_PROMPT);
@@ -402,10 +417,14 @@ function main() {
     config = { name: 'default', features: [], excludePaths: [], excludeChurn: [] };
   }
 
+  // Merge CLI excludes into config
+  const allExcludes = [...(config.excludePaths || []), ...cliExcludes];
+  const allChurnExcludes = [...(config.excludeChurn || []), ...cliExcludes];
+
   // 1. Run ctags
   const ctagsBin = findCtags();
   console.error(`Running ctags on ${absRoot}...`);
-  const rawEntries = runCtags(ctagsBin, absRoot, config.excludePaths || []);
+  const rawEntries = runCtags(ctagsBin, absRoot, allExcludes);
   console.error(`  ctags found ${rawEntries.length.toLocaleString()} raw entries`);
 
   // 2. Filter to meaningful symbols
@@ -450,7 +469,7 @@ function main() {
   // 5. Overlay git churn if --since provided
   if (since) {
     console.error(`Extracting git churn since ${since}...`);
-    const churnData = getGitChurn(absRoot, since, config.excludeChurn || []);
+    const churnData = getGitChurn(absRoot, since, allChurnExcludes);
 
     // Aggregate churn by feature
     for (const file of churnData) {
