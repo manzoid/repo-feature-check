@@ -1,0 +1,35 @@
+{
+  "name": "@manzoid2/repo-feature-check",
+  "version": "0.1.0",
+  "description": "Extract and categorize every function, method, and class in a codebase by user-facing feature using universal-ctags",
+  "bin": {
+    "repo-feature-check": "dist/census.js"
+  },
+  "files": [
+    "dist/",
+    "examples/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/census.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "codebase",
+    "analysis",
+    "ctags",
+    "feature-map",
+    "hotspot",
+    "churn",
+    "census"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
